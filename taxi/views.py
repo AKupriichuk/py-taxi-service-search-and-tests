@@ -74,13 +74,19 @@ class DriverListView(LoginRequiredMixin, generic.ListView):
     paginate_by = 5
 
     def get_queryset(self):
-        queryset = get_user_model().objects.all()
+        queryset = super().get_queryset()
         form = SearchForm(self.request.GET)
         if form.is_valid():
-            queryset = queryset.filter(
+            return queryset.filter(
                 username__icontains=form.cleaned_data["title"]
-            )
+            ).order_by("username")
         return queryset.order_by("username")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        title = self.request.GET.get("title", "")
+        context["search_form"] = SearchForm(initial={"title": title})
+        return context
 
 
 class DriverCreateView(LoginRequiredMixin, generic.CreateView):
