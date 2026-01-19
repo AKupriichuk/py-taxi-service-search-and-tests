@@ -39,7 +39,9 @@ class ManufacturerListView(LoginRequiredMixin, generic.ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["search_form"] = SearchForm(initial={"title": self.request.GET.get("title", "")})
+        context["search_form"] = SearchForm(
+            initial={"title": self.request.GET.get("title", "")}
+        )
         return context
 
 
@@ -49,7 +51,7 @@ class CarListView(LoginRequiredMixin, generic.ListView):
     queryset = Car.objects.select_related("manufacturer")
 
     def get_queryset(self):
-        queryset = super().get_queryset() # Зберігаємо select_related
+        queryset = super().get_queryset()
         title = self.request.GET.get("title")
         if title:
             queryset = queryset.filter(model__icontains=title)
@@ -57,7 +59,9 @@ class CarListView(LoginRequiredMixin, generic.ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["search_form"] = SearchForm(initial={"title": self.request.GET.get("title", "")})
+        context["search_form"] = SearchForm(
+            initial={"title": self.request.GET.get("title", "")}
+        )
         return context
 
 
@@ -89,6 +93,7 @@ class DriverDeleteView(LoginRequiredMixin, generic.DeleteView):
     model = get_user_model()
     success_url = reverse_lazy("taxi:driver-list")
 
+
 @login_required
 def toggle_assign_to_car(request, pk):
     driver = get_user_model().objects.get(id=request.user.id)
@@ -118,7 +123,9 @@ class CarDeleteView(LoginRequiredMixin, generic.DeleteView):
 
 class DriverDetailView(LoginRequiredMixin, generic.DetailView):
     model = get_user_model()
-    queryset = get_user_model().objects.all().prefetch_related("cars__manufacturer")
+    queryset = (get_user_model().objects.all().
+                prefetch_related("cars__manufacturer")
+                )
 
 
 class DriverLicenseUpdateView(LoginRequiredMixin, generic.UpdateView):

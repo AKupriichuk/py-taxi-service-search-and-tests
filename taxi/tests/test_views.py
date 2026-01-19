@@ -3,6 +3,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from taxi.models import Manufacturer, Car
 
+
 class SearchTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -24,7 +25,9 @@ class SearchTests(TestCase):
         self.client.force_login(self.user)
 
     def test_manufacturer_search(self):
-        res = self.client.get(reverse("taxi:manufacturer-list"), {"title": "toy"})
+        res = self.client.get(reverse("taxi:manufacturer-list"),
+                              {"title": "toy"}
+                              )
         self.assertContains(res, "Toyota")
 
     def test_car_search(self):
