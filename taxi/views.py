@@ -1,84 +1,46 @@
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse_lazy
 from django.views import generic
-from django.contrib.auth.mixins import LoginRequiredMixin
-
-from .models import Driver, Car, Manufacturer
-from taxi.forms import (
+from .models import Car, Manufacturer
+from .forms import (
     DriverCreationForm,
-    DriverLicenseUpdateForm,
+    SearchForm,
     CarForm,
-    DriverTitleSearchForm,
-    CarTitleSearchForm,
-    ManufacturerTitleSearchForm
+    DriverLicenseUpdateForm
 )
 
 
 @login_required
 def index(request):
-    """View function for the home page of the site."""
-
-    num_drivers = Driver.objects.count()
-    num_cars = Car.objects.count()
-    num_manufacturers = Manufacturer.objects.count()
-
-    num_visits = request.session.get("num_visits", 0)
-    request.session["num_visits"] = num_visits + 1
-
     context = {
-        "num_drivers": num_drivers,
-        "num_cars": num_cars,
-        "num_manufacturers": num_manufacturers,
-        "num_visits": num_visits + 1,
+        "num_drivers": get_user_model().objects.count(),
+        "num_cars": Car.objects.count(),
+        "num_manufacturers": Manufacturer.objects.count(),
+        "num_visits": request.session.get("num_visits", 0) + 1,
     }
-
+    request.session["num_visits"] = context["num_visits"]
     return render(request, "taxi/index.html", context=context)
 
 
 class ManufacturerListView(LoginRequiredMixin, generic.ListView):
     model = Manufacturer
-    context_object_name = "manufacturer_list"
-    template_name = "taxi/manufacturer_list.html"
     paginate_by = 5
 
     def get_queryset(self):
         queryset = Manufacturer.objects.all()
-        form = ManufacturerTitleSearchForm(self.request.GET)
-
+        form = SearchForm(self.request.GET)
         if form.is_valid():
-            return queryset.filter(
-                name__icontains=form.cleaned_data["title"]
-            )
+            return queryset.filter(name__icontains=form.cleaned_data["title"])
         return queryset
 
-    def get_context_data(self, *, object_list=None, **kwargs):
+    def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-
-        title = self.request.GET.get("title", "")
-
-        context["search_form"] = ManufacturerTitleSearchForm(
-            initial={"title": title}
-        )
+        context["search_form"] = SearchForm(initial={"title": self.request.GET.get("title", "")})
         return context
-
-
-class ManufacturerCreateView(LoginRequiredMixin, generic.CreateView):
-    model = Manufacturer
-    fields = "__all__"
-    success_url = reverse_lazy("taxi:manufacturer-list")
-
-
-class ManufacturerUpdateView(LoginRequiredMixin, generic.UpdateView):
-    model = Manufacturer
-    fields = "__all__"
-    success_url = reverse_lazy("taxi:manufacturer-list")
-
-
-class ManufacturerDeleteView(LoginRequiredMixin, generic.DeleteView):
-    model = Manufacturer
-    success_url = reverse_lazy("taxi:manufacturer-list")
 
 
 class CarListView(LoginRequiredMixin, generic.ListView):
@@ -87,28 +49,54 @@ class CarListView(LoginRequiredMixin, generic.ListView):
     queryset = Car.objects.select_related("manufacturer")
 
     def get_queryset(self):
-        queryset = Car.objects.all().order_by("model")
-        form = CarTitleSearchForm(self.request.GET)
+        queryset = super().get_queryset() # Зберігаємо select_related
+        title = self.request.GET.get("title")
+        if title:
+            queryset = queryset.filter(model__icontains=title)
+        return queryset.order_by("model")
 
-        if form.is_valid():
-            return queryset.filter(
-                model__icontains=form.cleaned_data["title"]
-            )
-        return queryset
-
-    def get_context_data(self, *, object_list=None, **kwargs):
+    def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-
-        title = self.request.GET.get("title", "")
-
-        context["search_form"] = CarTitleSearchForm(
-            initial={"title": title}
-        )
+        context["search_form"] = SearchForm(initial={"title": self.request.GET.get("title", "")})
         return context
 
 
 class CarDetailView(LoginRequiredMixin, generic.DetailView):
     model = Car
+
+
+class DriverListView(LoginRequiredMixin, generic.ListView):
+    model = get_user_model()
+    paginate_by = 5
+
+    def get_queryset(self):
+        queryset = get_user_model().objects.all()
+        form = SearchForm(self.request.GET)
+        if form.is_valid():
+            queryset = queryset.filter(
+                username__icontains=form.cleaned_data["title"]
+            )
+        return queryset.order_by("username")
+
+
+class DriverCreateView(LoginRequiredMixin, generic.CreateView):
+    model = get_user_model()
+    form_class = DriverCreationForm
+    success_url = reverse_lazy("taxi:driver-list")
+
+
+class DriverDeleteView(LoginRequiredMixin, generic.DeleteView):
+    model = get_user_model()
+    success_url = reverse_lazy("taxi:driver-list")
+
+@login_required
+def toggle_assign_to_car(request, pk):
+    driver = get_user_model().objects.get(id=request.user.id)
+    if Car.objects.get(id=pk) in driver.cars.all():
+        driver.cars.remove(pk)
+    else:
+        driver.cars.add(pk)
+    return HttpResponseRedirect(reverse_lazy("taxi:car-detail", args=[pk]))
 
 
 class CarCreateView(LoginRequiredMixin, generic.CreateView):
@@ -128,59 +116,29 @@ class CarDeleteView(LoginRequiredMixin, generic.DeleteView):
     success_url = reverse_lazy("taxi:car-list")
 
 
-class DriverListView(LoginRequiredMixin, generic.ListView):
-    model = Driver
-    paginate_by = 5
-
-    def get_queryset(self):
-        queryset = Driver.objects.all().order_by("username")
-        form = DriverTitleSearchForm(self.request.GET)
-
-        if form.is_valid():
-            return queryset.filter(
-                username__icontains=form.cleaned_data["title"]
-            )
-        return queryset
-
-    def get_context_data(self, *, object_list=None, **kwargs):
-        context = super().get_context_data(**kwargs)
-
-        title = self.request.GET.get("title", "")
-
-        context["search_form"] = DriverTitleSearchForm(
-            initial={"title": title}
-        )
-        return context
-
-
 class DriverDetailView(LoginRequiredMixin, generic.DetailView):
-    model = Driver
-    queryset = Driver.objects.all().prefetch_related("cars__manufacturer")
-
-
-class DriverCreateView(LoginRequiredMixin, generic.CreateView):
-    model = Driver
-    form_class = DriverCreationForm
+    model = get_user_model()
+    queryset = get_user_model().objects.all().prefetch_related("cars__manufacturer")
 
 
 class DriverLicenseUpdateView(LoginRequiredMixin, generic.UpdateView):
-    model = Driver
+    model = get_user_model()
     form_class = DriverLicenseUpdateForm
     success_url = reverse_lazy("taxi:driver-list")
 
 
-class DriverDeleteView(LoginRequiredMixin, generic.DeleteView):
-    model = Driver
-    success_url = reverse_lazy("")
+class ManufacturerCreateView(LoginRequiredMixin, generic.CreateView):
+    model = Manufacturer
+    fields = "__all__"
+    success_url = reverse_lazy("taxi:manufacturer-list")
 
 
-@login_required
-def toggle_assign_to_car(request, pk):
-    driver = Driver.objects.get(id=request.user.id)
-    if (
-        Car.objects.get(id=pk) in driver.cars.all()
-    ):  # probably could check if car exists
-        driver.cars.remove(pk)
-    else:
-        driver.cars.add(pk)
-    return HttpResponseRedirect(reverse_lazy("taxi:car-detail", args=[pk]))
+class ManufacturerUpdateView(LoginRequiredMixin, generic.UpdateView):
+    model = Manufacturer
+    fields = "__all__"
+    success_url = reverse_lazy("taxi:manufacturer-list")
+
+
+class ManufacturerDeleteView(LoginRequiredMixin, generic.DeleteView):
+    model = Manufacturer
+    success_url = reverse_lazy("taxi:manufacturer-list")

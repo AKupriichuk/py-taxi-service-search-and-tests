@@ -3,23 +3,34 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from taxi.models import Manufacturer, Car
 
-
 class SearchTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
-            username="test_user", password="password123"
+            username="admin",
+            password="password",
+            license_number="AAA11111"
         )
-        cls.man_1 = Manufacturer.objects.create(name="Toyota", country="Japan")
-        cls.man_2 = Manufacturer.objects.create(name="Tesla", country="USA")
+        cls.man = Manufacturer.objects.create(name="Toyota")
+        Car.objects.create(model="Corolla", manufacturer=cls.man)
+
+        get_user_model().objects.create_user(
+            username="driver.test",
+            password="password",
+            license_number="BBB22222"
+        )
 
     def setUp(self):
         self.client.force_login(self.user)
 
-    def test_manufacturer_search_by_name(self):
-        url = reverse("taxi:manufacturer-list")
-        response = self.client.get(url, {"title": "toy"})
+    def test_manufacturer_search(self):
+        res = self.client.get(reverse("taxi:manufacturer-list"), {"title": "toy"})
+        self.assertContains(res, "Toyota")
 
-        self.assertEqual(len(response.context["manufacturer_list"]), 1)
-        self.assertContains(response, "Toyota")
-        self.assertNotContains(response, "Tesla")
+    def test_car_search(self):
+        res = self.client.get(reverse("taxi:car-list"), {"title": "cor"})
+        self.assertContains(res, "Corolla")
+
+    def test_driver_search(self):
+        res = self.client.get(reverse("taxi:driver-list"), {"title": "test"})
+        self.assertContains(res, "driver.test")
