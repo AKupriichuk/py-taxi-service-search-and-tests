@@ -15,6 +15,7 @@ from taxi.forms import (
     ManufacturerTitleSearchForm
 )
 
+
 @login_required
 def index(request):
     """View function for the home page of the site."""
@@ -84,6 +85,7 @@ class CarListView(LoginRequiredMixin, generic.ListView):
     model = Car
     paginate_by = 5
     queryset = Car.objects.select_related("manufacturer")
+
     def get_queryset(self):
         queryset = Car.objects.all().order_by("model")
         form = CarTitleSearchForm(self.request.GET)
@@ -129,6 +131,7 @@ class CarDeleteView(LoginRequiredMixin, generic.DeleteView):
 class DriverListView(LoginRequiredMixin, generic.ListView):
     model = Driver
     paginate_by = 5
+
     def get_queryset(self):
         queryset = Driver.objects.all().order_by("username")
         form = DriverTitleSearchForm(self.request.GET)
